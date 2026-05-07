@@ -358,6 +358,57 @@ body {
   color: var(--text2);
 }
 
+/* ── CHAMPION CARD ── */
+.champion-card {
+  margin: 8px 16px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.champion-card.champion-open {
+  border-color: var(--gold);
+  background: linear-gradient(135deg, rgba(245,200,66,0.08) 0%, var(--card) 60%);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.champion-card.champion-open:hover { transform: translateY(-1px); }
+.champion-card.champion-won { border-color: var(--gold); background: rgba(245,200,66,0.07); }
+.champion-card.champion-lost { border-color: var(--text3); }
+.champion-card-title { font-size: 14px; font-weight: 800; color: var(--gold); margin-bottom: 8px; }
+.champion-card-sub { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+.champion-pick-btn {
+  display: inline-block; padding: 8px 16px; border-radius: 8px;
+  background: var(--gold); color: #000; font-size: 13px; font-weight: 700;
+}
+.champion-card-pick {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+}
+.champion-team-name { font-size: 16px; font-weight: 800; flex: 1; }
+.champion-lock { font-size: 18px; }
+.champion-result { font-size: 13px; font-weight: 700; margin-top: 4px; }
+.champion-pending { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* ── CHAMPION MODAL ── */
+.champion-modal { max-height: 85vh; }
+.champion-team-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; max-height: 340px; overflow-y: auto;
+  padding-right: 4px;
+}
+.champion-team-grid::-webkit-scrollbar { width: 4px; }
+.champion-team-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.champion-team-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; font-family: inherit;
+  text-align: right;
+}
+.champion-team-item:hover { border-color: var(--gold); background: rgba(245,200,66,0.07); }
+.champion-team-item.selected { border-color: var(--gold); background: rgba(245,200,66,0.12); color: var(--gold); }
+
 /* ── UTILS ── */
 .gap-8 { gap: 8px; }
 .flex { display: flex; }

@@ -48,4 +48,13 @@ export const statsApi = {
   pending: () => api.get('/notifications/pending'),
 };
 
+export const teamsApi = {
+  getAll: () => api.get('/teams'),
+};
+
+export const championApi = {
+  get: () => api.get('/bets/champion'),
+  place: (data) => api.post('/bets/champion', data),
+};
+
 export default api;

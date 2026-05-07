@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { matchesApi, betsApi } from '../api';
 import { formatKickoff, isBettingOpen, isLive, isFinished, scoreStr, getPointsColor } from '../utils/matchHelpers';
 import { useAuth } from '../AuthContext';
+import { FlagImg } from './MatchesPage';
 
 export default function MatchDetailPage() {
   const { id } = useParams();
@@ -111,11 +112,11 @@ export default function MatchDetailPage() {
             <div className="modal-body">
               <div className="et-choice">
                 <button className={`et-btn ${etWinner==='home'?'selected':''}`} onClick={() => setEtWinner('home')}>
-                  <span className="flag">{match.home_flag}</span>
+                  <span className="flag"><FlagImg code={match.home_team_code} size={32} alt={match.home_team} /></span>
                   {match.home_team}
                 </button>
                 <button className={`et-btn ${etWinner==='away'?'selected':''}`} onClick={() => setEtWinner('away')}>
-                  <span className="flag">{match.away_flag}</span>
+                  <span className="flag"><FlagImg code={match.away_team_code} size={32} alt={match.away_team} /></span>
                   {match.away_team}
                 </button>
               </div>
@@ -138,7 +139,7 @@ export default function MatchDetailPage() {
       <div style={{padding:'16px 20px', textAlign:'center'}}>
         <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:20}}>
           <div className="team" style={{minWidth:80}}>
-            <div style={{fontSize:52}}>{match.home_flag}</div>
+            <div style={{display:'flex', justifyContent:'center'}}><FlagImg code={match.home_team_code} size={52} alt={match.home_team} /></div>
             <div style={{fontSize:15, fontWeight:800, marginTop:6}}>{match.home_team}</div>
           </div>
           <div style={{textAlign:'center'}}>
@@ -152,7 +153,7 @@ export default function MatchDetailPage() {
             {live && <div className="live-badge" style={{margin:'8px auto', width:'fit-content'}}><span className="live-dot"/>משחק חי</div>}
           </div>
           <div className="team" style={{minWidth:80}}>
-            <div style={{fontSize:52}}>{match.away_flag}</div>
+            <div style={{display:'flex', justifyContent:'center'}}><FlagImg code={match.away_team_code} size={52} alt={match.away_team} /></div>
             <div style={{fontSize:15, fontWeight:800, marginTop:6}}>{match.away_team}</div>
           </div>
         </div>

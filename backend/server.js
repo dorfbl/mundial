@@ -21,8 +21,8 @@ async function syncMatches() {
   const db = getDb();
   
   const upsert = db.prepare(`
-    INSERT INTO matches (api_id, home_team, away_team, home_team_code, away_team_code, home_flag, away_flag, kickoff, stage, group_name, status, home_score, away_score, home_score_et, away_score_et, winner_et, is_knockout, updated_at)
-    VALUES (@api_id, @home_team, @away_team, @home_team_code, @away_team_code, @home_flag, @away_flag, @kickoff, @stage, @group_name, @status, @home_score, @away_score, @home_score_et, @away_score_et, @winner_et, @is_knockout, datetime('now'))
+    INSERT INTO matches (api_id, home_team, away_team, home_team_code, away_team_code, home_flag, away_flag, kickoff, stage, stage_key, group_name, status, home_score, away_score, home_score_et, away_score_et, winner_et, is_knockout, updated_at)
+    VALUES (@api_id, @home_team, @away_team, @home_team_code, @away_team_code, @home_flag, @away_flag, @kickoff, @stage, @stage_key, @group_name, @status, @home_score, @away_score, @home_score_et, @away_score_et, @winner_et, @is_knockout, datetime('now'))
     ON CONFLICT(api_id) DO UPDATE SET
       home_team=excluded.home_team,
       away_team=excluded.away_team,
@@ -32,6 +32,7 @@ async function syncMatches() {
       away_flag=excluded.away_flag,
       kickoff=excluded.kickoff,
       stage=excluded.stage,
+      stage_key=excluded.stage_key,
       group_name=excluded.group_name,
       status=excluded.status,
       home_score=excluded.home_score,
@@ -70,20 +71,38 @@ async function syncLive() {
 function recalculateAllPoints() {
   const db = getDb();
   const finishedMatches = db.prepare(`SELECT * FROM matches WHERE status IN ('FINISHED','AWARDED') AND home_score IS NOT NULL`).all();
-  
+
   for (const match of finishedMatches) {
     const bets = db.prepare(`SELECT * FROM bets WHERE match_id=?`).all(match.id);
     for (const bet of bets) {
       const pts = calculateBetPoints(bet.home_score, bet.away_score, match.home_score, match.away_score, bet.is_doubled === 1);
       db.prepare(`UPDATE bets SET points=? WHERE id=?`).run(pts, bet.id);
     }
-    
+
     // ET bets
     if (match.winner_et && match.winner_et !== 'DRAW') {
       const etBets = db.prepare(`SELECT * FROM extra_time_bets WHERE match_id=?`).all(match.id);
       for (const eb of etBets) {
         const pts = calculateEtPoints(eb.winner, match.winner_et);
         db.prepare(`UPDATE extra_time_bets SET points=? WHERE id=?`).run(pts, eb.id);
+      }
+    }
+  }
+
+  // Champion bets: winner is the team that won the FINAL
+  const finalMatch = db.prepare(`SELECT * FROM matches WHERE stage_key='FINAL' AND status IN ('FINISHED','AWARDED') AND home_score IS NOT NULL`).get();
+  if (finalMatch) {
+    let winnerName = null;
+    if (finalMatch.home_score > finalMatch.away_score) winnerName = finalMatch.home_team;
+    else if (finalMatch.away_score > finalMatch.home_score) winnerName = finalMatch.away_team;
+    else if (finalMatch.winner_et === 'HOME_TEAM') winnerName = finalMatch.home_team;
+    else if (finalMatch.winner_et === 'AWAY_TEAM') winnerName = finalMatch.away_team;
+
+    if (winnerName) {
+      const championBets = db.prepare(`SELECT * FROM champion_bets`).all();
+      for (const cb of championBets) {
+        const pts = cb.team_name === winnerName ? 8 : 0;
+        db.prepare(`UPDATE champion_bets SET points=? WHERE id=?`).run(pts, cb.id);
       }
     }
   }
@@ -267,22 +286,74 @@ app.post('/api/bets/extra-time', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── TEAMS ───────────────────────────────────────────────────────────────────
+app.get('/api/teams', authMiddleware, (req, res) => {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT home_team as name, home_team_code as code, home_flag as flag FROM matches
+    UNION
+    SELECT away_team as name, away_team_code as code, away_flag as flag FROM matches
+  `).all();
+  const seen = new Set();
+  const teams = [];
+  for (const t of rows) {
+    if (t.name && !seen.has(t.name)) {
+      seen.add(t.name);
+      teams.push(t);
+    }
+  }
+  teams.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  res.json(teams);
+});
+
+// ─── CHAMPION BETS ────────────────────────────────────────────────────────────
+function isChampionBetOpen() {
+  const db = getDb();
+  const result = db.prepare(`SELECT MIN(kickoff) as first_kickoff FROM matches`).get();
+  if (!result?.first_kickoff) return true;
+  return new Date() < new Date(result.first_kickoff);
+}
+
+app.get('/api/bets/champion', authMiddleware, (req, res) => {
+  const db = getDb();
+  const bet = db.prepare(`SELECT * FROM champion_bets WHERE user_id=?`).get(req.user.id);
+  res.json({ bet: bet || null, isOpen: isChampionBetOpen() });
+});
+
+app.post('/api/bets/champion', authMiddleware, (req, res) => {
+  const { team_name, team_code, team_flag } = req.body;
+  if (!team_name || !team_code) return res.status(400).json({ error: 'נדרש שם קבוצה' });
+
+  if (!isChampionBetOpen()) return res.status(400).json({ error: 'החלון לניחוש האלוף נסגר' });
+
+  const db = getDb();
+  const existing = db.prepare(`SELECT * FROM champion_bets WHERE user_id=?`).get(req.user.id);
+  if (existing) return res.status(400).json({ error: 'כבר בחרת אלוף, לא ניתן לשנות' });
+
+  db.prepare(`INSERT INTO champion_bets (user_id, team_name, team_code, team_flag) VALUES (?,?,?,?)`)
+    .run(req.user.id, team_name, team_code, team_flag || null);
+  res.json({ ok: true });
+});
+
 // ─── LEADERBOARD & STATS ──────────────────────────────────────────────────────
 app.get('/api/leaderboard', authMiddleware, (req, res) => {
   const db = getDb();
   
   const users = db.prepare(`
-    SELECT 
+    SELECT
       u.id, u.display_name, u.username,
-      COALESCE(SUM(b.points), 0) + COALESCE(SUM(eb.points), 0) as total_points,
+      COALESCE(SUM(b.points), 0) + COALESCE(SUM(eb.points), 0) + COALESCE(MAX(cb.points), 0) as total_points,
       COALESCE(SUM(b.points), 0) as bet_points,
       COALESCE(SUM(eb.points), 0) as et_points,
+      COALESCE(MAX(cb.points), 0) as champion_points,
+      MAX(cb.team_name) as champion_pick,
       COUNT(DISTINCT b.id) as total_bets,
       COUNT(DISTINCT CASE WHEN b.points = 3 THEN b.id END) as exact_bets,
       COUNT(DISTINCT CASE WHEN b.points > 0 THEN b.id END) as correct_bets
     FROM users u
     LEFT JOIN bets b ON b.user_id = u.id
     LEFT JOIN extra_time_bets eb ON eb.user_id = u.id
+    LEFT JOIN champion_bets cb ON cb.user_id = u.id
     WHERE u.username != 'admin'
     GROUP BY u.id
     ORDER BY total_points DESC, exact_bets DESC
@@ -310,8 +381,9 @@ app.get('/api/stats/me', authMiddleware, (req, res) => {
   
   const doubledBets = db.prepare(`SELECT * FROM doubled_bets WHERE user_id=?`).all(req.user.id);
   const streak = calculateStreak(req.user.id, db);
-  
-  res.json({ ...stats, doubledBets, streak });
+  const championBet = db.prepare(`SELECT * FROM champion_bets WHERE user_id=?`).get(req.user.id) || null;
+
+  res.json({ ...stats, doubledBets, streak, championBet });
 });
 
 function calculateStreak(userId, db) {

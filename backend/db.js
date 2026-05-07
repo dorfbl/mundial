@@ -84,6 +84,16 @@ function initSchema() {
       used_at TEXT DEFAULT (datetime('now')),
       UNIQUE(user_id, bet_type)
     );
+
+    CREATE TABLE IF NOT EXISTS champion_bets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+      team_name TEXT NOT NULL,
+      team_code TEXT NOT NULL,
+      team_flag TEXT,
+      points INTEGER,
+      locked_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
