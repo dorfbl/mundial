@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: mundial-backend
+    restart: unless-stopped
+    environment:
+      - FOOTBALL_API_KEY=1223fe38ed6b4d4091c365aa5ccbe5cf
+      - ADMIN_PASSWORD=admin123
+      - JWT_SECRET=mundial2026-change-this-secret
+      - PORT=3001
+      - DB_PATH=/app/data/mundial.db
+    volumes:
+      - mundial-data:/app/data
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - REACT_APP_API_URL=http://10.10.10.135:3001/api
+    container_name: mundial-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mundial-data:
